@@ -1,19 +1,32 @@
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from config import QUESTIONS
 
 #****************************** Set-up LLM and Utility Function ********************************
 load_dotenv()
 chat_model = ChatGoogleGenerativeAI(model = 'gemini-1.5-flash')
 
-def get_llm_reply(user_answer, next_question):
-    """Pass user answer + next question to LLM and return formatted reply."""
-    prompt = (
-        "You are a polite and friendly assistant collecting details for an interview.\n\n"
-        f"The user answered: {user_answer}\n\n"
-        f"Now, ask them this next question in a natural, but formal conversational way: {next_question}"
-    )
-    response = chat_model.invoke(prompt)
+def get_llm_reply(message_history, next_question):
+    """
+    Pass the entire chat history + the next question to the LLM
+    and return a natural conversational reply.
+    """
+    # Convert Streamlit's history format into LangChain messages
+    messages = [SystemMessage(content="You are a polite HR assistant collecting details for an interview. " \
+                                                "Be cheerful and appreciative towards the user.")]
+    for msg in message_history:
+        if msg["role"] == "user":
+            messages.append(HumanMessage(content=msg["content"]))
+        elif msg["role"] == "assistant":
+            messages.append(AIMessage(content=msg["content"]))
+
+    # Add the instruction to move forward
+    messages.append(HumanMessage(content=f"Now ask the next question in a natural but polite way: {next_question}"))
+
+    # Invoke LLM
+    response = chat_model.invoke(messages)
     return response.content
 
 
@@ -22,7 +35,7 @@ st.set_page_config(page_title="Personal Details", layout="centered")
 
 
 #***************************** Title and subtitle *********************************************
-st.markdown('<p class="big-font">Kindly provide us with your details </p>', unsafe_allow_html=True)
+st.markdown('<header class="big-font"><h2>Kindly provide us with your details </header>', unsafe_allow_html=True)
 
 
 #***************************** SESSION STATE SETUP ********************************************
@@ -31,16 +44,6 @@ if "message_history" not in st.session_state:
 if "question_index" not in st.session_state:
     st.session_state.question_index = 0  # Track which question we're on
 
-
-#***************************** Set the Questions for Personal Details ************************
-QUESTIONS = [
-    "Please enter your Full Name",
-    "Please enter your e-mail address",
-    "Please enter your phone number",
-    "Please enter Years of Experience you have in your desired field",
-    "Please enter your desired position(s)",
-    "Please enter the Tech Stack(s) you are familiar with. Note that your subsequent interview will based on the basis of your tech stack"
-]    
 
 
 #***************************** Initial Questionaire ********************************************
@@ -63,13 +66,19 @@ if st.session_state.question_index < len(QUESTIONS):
     # Show the next question (if available)
     if st.session_state.question_index < len(QUESTIONS):
         next_question = QUESTIONS[st.session_state.question_index]
-        llm_reply = get_llm_reply(user_input, next_question)
+        llm_reply = get_llm_reply(st.session_state.message_history, next_question)
         st.session_state.message_history.append({"role": "assistant", "content": llm_reply})
         st.chat_message("assistant").write(llm_reply)
 
     # Last scenario - All questions asked
     if st.session_state.question_index == len(QUESTIONS):
-        st.chat_message("assistant").write(" Thank you for answering all the questions! \n We will now move forward with the interview")
+        final_message = f" Thank you for answering all the questions! We will now move forward with the interview"
+        st.chat_message("assistant").write(final_message)
+        st.session_state.message_history.append({"role": "assistant", "content": final_message})
+
+        # Show button to redirect
+        if st.button("➡️ Go to Interview"):
+            st.switch_page("pages/interview.py")
 
 
 print (st.session_state.message_history)
