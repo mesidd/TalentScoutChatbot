@@ -23,7 +23,7 @@ with open("InterviewerLLMPrompt.txt", "r") as f:
 #****************************** SESSION STATE ***********************************************
 # For details gathering section
 if "stage" not in st.session_state:
-    st.session_state.stage = "welcome"   # stages: welcome → details → interview
+    st.session_state.stage = "welcome"   # stages: welcome → details → interview → thankyou
 if "message_history" not in st.session_state:
     st.session_state.message_history = []
 if "question_index" not in st.session_state:
@@ -155,7 +155,18 @@ elif st.session_state.stage == "interview":
                     with st.chat_message("assistant"):
                         st.markdown(response.content)
 
+    if st.session_state.done == True:
+        if st.button("I am Done"):
+            st.session_state.stage = "thankyou"
+            st.rerun()
 
-    if st.button("⬅️ Back to Details"):
-        st.session_state.stage = "details"
-        st.rerun()
+#****************************** THANK YOU PAGE ***********************************************
+elif st.session_state.stage == "thankyou":
+    # Page title
+    st.title("Thank You!")
+
+    # Thank you message
+    st.markdown('<p class="big-font">🎉 Your submission has been received successfully. </p>', unsafe_allow_html=True)
+
+    # Add a small note or next steps
+    st.write("You can now close this page.")
