@@ -1,0 +1,11 @@
+.big-font {
+    font-size: 40px !important;
+    text-align: center;
+    font-weight: bold;
+}
+
+.small-font {
+    font-size: 20px !important;
+    text-align: center;
+    color: rgb(171, 170, 170);
+}

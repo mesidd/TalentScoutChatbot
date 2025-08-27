@@ -32,7 +32,7 @@ st.markdown('<p class="small-font">I am an intelligent Hiring Assistant chatbot 
 st.markdown('<p class="small-font"> Here, your interview will be conducted. You need to provide us with a few details and we can get started with it', unsafe_allow_html=True)
 
 # Add a button to continue
-if st.button("🚀 Get Started"):
+if st.button(" Get Started"):
     st.switch_page("pages/details.py")  # works if you're using multipage setup
 
 
