@@ -59,7 +59,7 @@ This project focuses on building a hiring chatbot. The goal of this project is t
 
 `Model` : The model is build using `Langgraph` and `Anthropic` Model is used as the Large Language Model.
 
-## Prompt Design & Execution Flow
+# Prompt Design & Execution Flow
 
 This section explains how the TalentScout AI Interviewer prompt is structured to conduct adaptive, progressive technical interviews based on a candidate's declared tech stack.
 

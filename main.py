@@ -3,7 +3,7 @@ from langchain_anthropic import ChatAnthropic
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from config import QUESTIONS
-from utils import get_llm_reply, extract_data_from_session_state
+from utils import get_llm_reply, extract_data_from_session_state, stream_llm_response
 
 #****************************** Set-up LLM and Utility Function ********************************
 load_dotenv()
@@ -68,9 +68,10 @@ elif st.session_state.stage == "details":
 
         if st.session_state.question_index < len(QUESTIONS):
             next_question = QUESTIONS[st.session_state.question_index]
-            llm_reply = get_llm_reply(st.session_state.message_history, next_question)
-            st.session_state.message_history.append({"role": "assistant", "content": llm_reply})
-            st.chat_message("assistant").write(llm_reply)
+
+            # Stream reply
+            response_text = get_llm_reply(st.session_state.message_history, next_question)
+            st.session_state.message_history.append({"role": "assistant", "content": response_text})
 
         if st.session_state.question_index == len(QUESTIONS):
             final_message = "Thank you for answering all the questions! We will now move forward with the interview"
@@ -79,8 +80,8 @@ elif st.session_state.stage == "details":
 
     if st.session_state.question_index >= len(QUESTIONS):
         if st.button("➡️ Go to Interview"):
-                st.session_state.stage = "interview"
-                st.rerun()
+            st.session_state.stage = "interview"
+            st.rerun()
 
 
 #****************************** INTERVIEW PAGE ***********************************************
@@ -89,7 +90,6 @@ elif st.session_state.stage == "interview":
     st.write("Enter START to begin. If you want to quit the interview at any moment, enter EXIT")
 
     peronsal_details = extract_data_from_session_state(st.session_state.message_history)
-
 
     # Chat display
     for msg in st.session_state.messages:
@@ -105,12 +105,10 @@ elif st.session_state.stage == "interview":
         user_input = st.chat_input("Type START to begin, or EXIT to quit...")
 
         if user_input:
-
             # Show user's message immediately
             st.session_state.messages.append(HumanMessage(content=user_input))
             with st.chat_message("user"):
                 st.markdown(user_input)
-
 
             # Handle EXIT
             if user_input.strip().upper() == "EXIT":
@@ -123,16 +121,23 @@ elif st.session_state.stage == "interview":
                 st.session_state.active = True
                 st.session_state.step = 1
 
-                # Generate first question
+                # Generate first question with streaming
                 with st.spinner("Generating first question..."):
-                    response = chat_model.invoke(st.session_state.messages + [
-                        HumanMessage(content=f"Tech stack: {peronsal_details.techstack}, YOE: {peronsal_details.experience}, POS: {peronsal_details.positions}. Start the Q&A. Ask the first question.")
-                    ])
-                st.session_state.messages.append(HumanMessage(content=user_input))
-                st.session_state.messages.append(response)
+                    response_text = ""
+                    with st.chat_message("assistant"):
+                        response_box = st.empty()
+                        for chunk in chat_model.stream(st.session_state.messages + [
+                            HumanMessage(content=f"Tech stack: {peronsal_details.techstack}, "
+                                                 f"Years Of Experience: {peronsal_details.experience}, "
+                                                 f"Desired Position: {peronsal_details.positions}. "
+                                                 "Start the Q&A. Ask the first question.")
+                        ]):
+                            if chunk.content:
+                                response_text += chunk.content
+                                response_box.markdown(response_text)
 
-                with st.chat_message("assistant"):
-                    st.markdown(response.content)
+                response = AIMessage(content=response_text)
+                st.session_state.messages.append(response)
 
             # Handle Q&A flow
             elif st.session_state.active and st.session_state.step <= 5:
@@ -144,16 +149,21 @@ elif st.session_state.stage == "interview":
                         st.markdown("✅ Thank you for your responses. Interview complete!")
                     st.session_state.done = True
                 else:
-                    # Continue with next question
+                    # Continue with next question with streaming
                     with st.spinner("Generating next question..."):
-                        response = chat_model.invoke(st.session_state.messages + [
-                            HumanMessage(content=f"Continue the interview. Ask question {st.session_state.step+1} of 5.")
-                        ])
+                        response_text = ""
+                        with st.chat_message("assistant"):
+                            response_box = st.empty()
+                            for chunk in chat_model.stream(st.session_state.messages + [
+                                HumanMessage(content=f"Continue the interview. Ask question {st.session_state.step+1} of 5.")
+                            ]):
+                                if chunk.content:
+                                    response_text += chunk.content
+                                    response_box.markdown(response_text)
+
+                    response = AIMessage(content=response_text)
                     st.session_state.messages.append(response)
                     st.session_state.step += 1
-
-                    with st.chat_message("assistant"):
-                        st.markdown(response.content)
 
     if st.session_state.done == True:
         if st.button("I am Done"):
